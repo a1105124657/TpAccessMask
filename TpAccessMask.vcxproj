@@ -146,6 +146,13 @@
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="RestoreAccess.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RestoreAccess.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
