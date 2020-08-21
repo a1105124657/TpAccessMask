@@ -22,7 +22,7 @@ Author: ZChameleon @ 2016
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/* win10 [+0x418] ObjectTable      : 0xffff9581af7c0d40 [Type: _HANDLE_TABLE *] */
 
 #define HANDLE_TABLE_OFFSET_WIN7	0x200
 #define HANDLE_TABLE_OFFSET_WIN10	0x418

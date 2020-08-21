@@ -63,6 +63,7 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry(
 	{
 		TableLevel1 = (PUCHAR)CapturedTable;
 
+		//Handle.Value相当于应用层传的伪句柄
 		Entry = (PHANDLE_TABLE_ENTRY)&TableLevel1[Handle.Value *
 			(sizeof(HANDLE_TABLE_ENTRY) / HANDLE_VALUE_INC)];
 
@@ -74,6 +75,9 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry(
 		TableLevel2 = (PUCHAR)CapturedTable;
 
 		i = Handle.Value % (LOWLEVEL_COUNT * HANDLE_VALUE_INC);
+		/*
+		
+		*/
 		Handle.Value -= i;
 		j = Handle.Value / ((LOWLEVEL_COUNT * HANDLE_VALUE_INC) / sizeof(PHANDLE_TABLE_ENTRY));
 
@@ -85,8 +89,15 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry(
 
 	case 2:
 	{
+		/*
+ULONG_PTR i; 最低层的表索引
+ULONG_PTR j; 中间层的表索引
+ULONG_PTR k; 最上层的表索引
+		
+		*/
 		TableLevel3 = (PUCHAR)CapturedTable;
-
+		//一页最多能存几个项，×4是最大的序号
+		//#define LOWLEVEL_COUNT (TABLE_PAGE_SIZE / sizeof(HANDLE_TABLE_ENTRY))
 		i = Handle.Value % (LOWLEVEL_COUNT * HANDLE_VALUE_INC);
 		Handle.Value -= i;
 		k = Handle.Value / ((LOWLEVEL_COUNT * HANDLE_VALUE_INC) / sizeof(PHANDLE_TABLE_ENTRY));
@@ -143,12 +154,18 @@ NTSTATUS RestoreObjectAccess(ULONG32 ActiveId, ULONG32 PassiveId)
 		}
 
 		*(ULONG_PTR*)&Object |= 0xFFFF000000000000;
+		/*
+		nt!_OBJECT_HEADER
+		+0x030 Body             : _QUAD
+		*/
 		*(ULONG_PTR*)&Object += 0x30;
 		ObjectType = ObGetObjectType(Object);
 		if (ObjectType == NULL)
 		{
 			continue;
 		}
+		//+0x010 Name             : _UNICODE_STRING
+		//+0x008 Buffer           : Ptr64 Wchar
 		if (wcscmp(*(PCWSTR*)((PUCHAR)ObjectType + 0x18), L"Process") == 0)
 		{
 			//int a = *(PULONG32)((PUCHAR)Object) + 0x2e8; 2e0 or 2e8
