@@ -153,13 +153,20 @@ extern "C"
 
 	NTKERNELAPI POBJECT_TYPE ObGetObjectType(PVOID Object);
 
+	UCHAR* PsGetProcessImageFileName(PEPROCESS Process);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 NTSTATUS RestoreObjectAccess(ULONG32 ActiveId, ULONG32 PassiveId);
 
+NTSTATUS RegitstCallbacksForProcess();
 
+NTSTATUS RegitstCallbacksForThread();
+
+OB_PREOP_CALLBACK_STATUS preCall(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION pOperationInformation);
+
+OB_PREOP_CALLBACK_STATUS preCall2(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION pOperationInformation);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 

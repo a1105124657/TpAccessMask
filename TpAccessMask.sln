@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.30225.117
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TpAccessMask", "TpAccessMask.vcxproj", "{C5E945F7-A16B-47C3-84D8-BF0D44806657}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "图标", "..\图标\图标.vcxproj", "{130DB37A-4250-4929-BD79-700CC0436773}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -41,6 +43,16 @@ Global
 		{C5E945F7-A16B-47C3-84D8-BF0D44806657}.Release|x86.ActiveCfg = Release|Win32
 		{C5E945F7-A16B-47C3-84D8-BF0D44806657}.Release|x86.Build.0 = Release|Win32
 		{C5E945F7-A16B-47C3-84D8-BF0D44806657}.Release|x86.Deploy.0 = Release|Win32
+		{130DB37A-4250-4929-BD79-700CC0436773}.Debug|ARM.ActiveCfg = Debug|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Debug|ARM64.ActiveCfg = Debug|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Debug|x64.ActiveCfg = Debug|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Debug|x64.Build.0 = Debug|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Debug|x86.ActiveCfg = Debug|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Release|ARM.ActiveCfg = Release|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Release|ARM64.ActiveCfg = Release|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Release|x64.ActiveCfg = Release|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Release|x64.Build.0 = Release|x64
+		{130DB37A-4250-4929-BD79-700CC0436773}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

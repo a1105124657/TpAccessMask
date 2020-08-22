@@ -10,12 +10,50 @@
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+typedef struct _LDR_DATA                         // 24 elements, 0xE0 bytes (sizeof)
+{
+	struct _LIST_ENTRY InLoadOrderLinks;                     // 2 elements, 0x10 bytes (sizeof)
+	struct _LIST_ENTRY InMemoryOrderLinks;                   // 2 elements, 0x10 bytes (sizeof)
+	struct _LIST_ENTRY InInitializationOrderLinks;           // 2 elements, 0x10 bytes (sizeof)
+	VOID* DllBase;
+	VOID* EntryPoint;
+	ULONG32      SizeOfImage;
+	UINT8        _PADDING0_[0x4];
+	struct _UNICODE_STRING FullDllName;                      // 3 elements, 0x10 bytes (sizeof)
+	struct _UNICODE_STRING BaseDllName;                      // 3 elements, 0x10 bytes (sizeof)
+	ULONG32      Flags;
+	UINT16       LoadCount;
+	UINT16       TlsIndex;
+	union
+	{
+		struct _LIST_ENTRY HashLinks;
+		struct
+		{
+			VOID* SectionPointer;
+			ULONG32      CheckSum;
+			UINT8        _PADDING1_[0x4];
+		};
+	};
 
+	union
+	{
+		ULONG32      TimeDateStamp;
+		VOID* LoadedImports;
+	};
+	struct _ACTIVATION_CONTEXT* EntryPointActivationContext;
+	VOID* PatchInformation;
+	struct _LIST_ENTRY ForwarderLinks;
+	struct _LIST_ENTRY ServiceTagLinks;
+	struct _LIST_ENTRY StaticLinks;
+	VOID* ContextInformation;
+	UINT64       OriginalBase;
+	union _LARGE_INTEGER LoadTime;
+}LDR_DATA, * PLDR_DATA;
 
 #define IOCTL_RESTORE_OBJECT_ACCESS \
 	CTL_CODE(FILE_DEVICE_UNKNOWN, 0X800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
-
+#define IOCTL_Stop CTL_CODE(FILE_DEVICE_UNKNOWN, 0X801, METHOD_BUFFERED, FILE_ANY_ACCESS)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -33,8 +71,12 @@ extern ULONG ID1, ID2;
 
 extern NTSTATUS RestoreObjectAccess(ULONG32 ActiveId, ULONG32 PassiveId);
 
-UNICODE_STRING g_SymbolicLink;
+extern BOOLEAN ifGoon;
 
+UNICODE_STRING g_SymbolicLink;
+extern NTSTATUS RegitstCallbacksForProcess();
+
+extern NTSTATUS RegitstCallbacksForThread();
 typedef struct _info
 {
 	ULONG ID1;
@@ -94,26 +136,39 @@ NTSTATUS DispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	{
 	case IOCTL_RESTORE_OBJECT_ACCESS:
 	{
-		//DbgPrint("正在执行提升句柄权限\n");
+#ifdef Debug
+		DbgPrint("正在执行提升句柄权限\n");
+#endif
 		if (InputBufferLength != sizeof(ULONG64))
 		{
 			Status = STATUS_INVALID_PARAMETER;
 			break;
 		}
+		
+		ifGoon = TRUE;
+
 		ID1 = ((info*)SystemBuffer)->ID1;
 		ID2 = ((info*)SystemBuffer)->ID2;
+#ifdef Debug
 		DbgPrint("CeID = %d dnfID = %d \n", ID1, ID2);
-
+#endif // Debug
 		DueTime.QuadPart = -10000 * 100;
 		KeInitializeTimer(&Timer);
 		KeInitializeDpc(&DPC, (PKDEFERRED_ROUTINE)&RestoreObjectAccess, NULL);
 		KeSetTimer(&Timer, DueTime, &DPC);
-
-		Status = RestoreObjectAccess(ID1, ID2);
+		
+		
 
 		break;
 	}
-
+	case IOCTL_Stop:
+	{
+		ifGoon = FALSE;
+		KeWaitForSingleObject(&Timer, Executive, KernelMode, FALSE, NULL);
+		KeCancelTimer(&Timer);
+		DbgPrint("CancelTimer!\n");
+		break;
+	}
 	default:
 		break;
 	}
@@ -185,6 +240,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegisterPath)
 	UNREFERENCED_PARAMETER(RegisterPath);
 
 	//CheckSystemVersion();
+	PLDR_DATA ldr;
+	ldr = (PLDR_DATA)DriverObject->DriverSection;
+	ldr->Flags |= 0x20;
 
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = DispatchCreate;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = DispatchClose;
@@ -196,6 +254,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegisterPath)
 	{
 		return Status;
 	}
+
+	RegitstCallbacksForProcess();
+	RegitstCallbacksForThread();
 
 	return Status;
 }

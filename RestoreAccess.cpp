@@ -8,6 +8,9 @@ Author: ZChameleon @ 2016
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+BOOLEAN ifGoon = false;
+HANDLE g_GameHandle = NULL;
+HANDLE g_ThreadHanle = NULL;
 KIRQL WPOFFx64()
 {
 	KIRQL irql = KeRaiseIrqlToDpcLevel();
@@ -42,8 +45,6 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry(
 
 	ULONG_PTR MaxHandle;
 
-	PAGED_CODE();
-
 	Handle = tHandle;
 	Handle.TagBits = 0;
 
@@ -73,12 +74,14 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry(
 	case 1:
 	{
 		TableLevel2 = (PUCHAR)CapturedTable;
-
-		i = Handle.Value % (LOWLEVEL_COUNT * HANDLE_VALUE_INC);
 		/*
-		
+		%0x400 = & 0x3ff
+		取最低十位 因为句柄后2位无效，加上一个页只能放256项，也就是8位
 		*/
+		i = Handle.Value % (LOWLEVEL_COUNT * HANDLE_VALUE_INC);
+		//最后十位清0
 		Handle.Value -= i;
+		// 右移10位然后×4 获得第二张表的索引
 		j = Handle.Value / ((LOWLEVEL_COUNT * HANDLE_VALUE_INC) / sizeof(PHANDLE_TABLE_ENTRY));
 
 		TableLevel1 = (PUCHAR) * (PHANDLE_TABLE_ENTRY*)&TableLevel2[j];
@@ -121,19 +124,25 @@ ULONG_PTR k; 最上层的表索引
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+//ce id  dnf id
 NTSTATUS RestoreObjectAccess(ULONG32 ActiveId, ULONG32 PassiveId)
 {
 	ActiveId = ID1;
 	PassiveId = ID2;
 	NTSTATUS Status = STATUS_UNSUCCESSFUL;
 	PEPROCESS EProcess = NULL;
+	PEPROCESS tEprocess = NULL;
 	ULONG_PTR Handle = 0;
 	PHANDLE_TABLE_ENTRY Entry = NULL;
 	PVOID Object = NULL;
 	POBJECT_TYPE ObjectType = NULL;
 
 	if (!NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)ActiveId, &EProcess)))
+	{
+		return Status;
+	}
+	
+	if (!NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)PassiveId, &tEprocess)))
 	{
 		return Status;
 	}
@@ -168,30 +177,85 @@ NTSTATUS RestoreObjectAccess(ULONG32 ActiveId, ULONG32 PassiveId)
 		//+0x008 Buffer           : Ptr64 Wchar
 		if (wcscmp(*(PCWSTR*)((PUCHAR)ObjectType + 0x18), L"Process") == 0)
 		{
-			//int a = *(PULONG32)((PUCHAR)Object) + 0x2e8; 2e0 or 2e8
-			//DbgPrint("a = %d\n", a);
-			//char* name = (char*)((PUCHAR)Object + 0x450);
-		///	DbgPrint("已执行 目标进程映像 %s\n", name);
-			if (*(PULONG32)((PUCHAR)Object + 0x2e8) == PassiveId)
+			//2e0+30h or 2e8+30h
+			//+0x2e0 UniqueProcessId  : 0x00000000`0000129c Void
+			if (*(PULONG32)((PUCHAR)Object + 0x2e0) == PassiveId)
 			{
-				//DbgPrint("已执行%s提升权限\n",name);
 				KIRQL irql = WPOFFx64();
 				__try {
 					Entry->GrantedAccessBits = 0x1FFFFF;
 				}
 				__except (1) {
-					DbgPrint("unhandled exception\n");
+					DbgPrint("exception!\n");
 				}
 				WPONx64(irql);
 				Status = STATUS_SUCCESS;
 			}
 		}
 	}
-
+	if(EProcess)
 	ObDereferenceObject(EProcess);
+	if(tEprocess)
+	ObDereferenceObject(tEprocess);
+	if(ifGoon)
 	KeSetTimer(&Timer, DueTime, &DPC);
 	return Status;
 }
 
+NTSTATUS RegitstCallbacksForProcess()
+{
+	NTSTATUS status;
+	OB_CALLBACK_REGISTRATION obReg;
+	OB_OPERATION_REGISTRATION opReg;
+	memset(&obReg, 0, sizeof(obReg));
+	obReg.Version = ObGetFilterVersion();
+	obReg.OperationRegistrationCount = 1;
+	obReg.RegistrationContext = NULL;
+	RtlInitUnicodeString(&obReg.Altitude, L"25444");
+	memset(&opReg, 0, sizeof(opReg));
+	opReg.ObjectType = PsProcessType;
+	opReg.Operations = OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE;
+	opReg.PreOperation = (POB_PRE_OPERATION_CALLBACK)preCall;
+	obReg.OperationRegistration = &opReg;
+	status = ObRegisterCallbacks(&obReg, &g_GameHandle);
+	return status;
+}
+NTSTATUS RegitstCallbacksForThread()
+{
+	NTSTATUS status;
+	OB_CALLBACK_REGISTRATION obReg;
+	OB_OPERATION_REGISTRATION opReg;
+	memset(&obReg, 0, sizeof(obReg));
+	obReg.Version = ObGetFilterVersion();
+	obReg.OperationRegistrationCount = 1;
+	obReg.RegistrationContext = NULL;
+	RtlInitUnicodeString(&obReg.Altitude, L"25444");
+	memset(&opReg, 0, sizeof(opReg));
+	opReg.ObjectType = PsThreadType;
+	opReg.Operations = OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE;
+	opReg.PreOperation = (POB_PRE_OPERATION_CALLBACK)preCall2;
+	obReg.OperationRegistration = &opReg;
+	status = ObRegisterCallbacks(&obReg, &g_ThreadHanle);
+	return status;
+}
+OB_PREOP_CALLBACK_STATUS preCall(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION pOperationInformation)
+{
+	if (strcmp((char*)PsGetProcessImageFileName(IoGetCurrentProcess()), "DNF.exe") == 0 || strcmp((char*)PsGetProcessImageFileName(IoGetCurrentProcess()), "dnf.exe") == 0)
+	{
+		return OB_PREOP_SUCCESS;
+	}
+	pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess = PROCESS_ALL_ACCESS;
+	pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess = PROCESS_ALL_ACCESS;
+	return OB_PREOP_SUCCESS;
+}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+OB_PREOP_CALLBACK_STATUS preCall2(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION pOperationInformation)
+{
+	if (strcmp((char*)PsGetProcessImageFileName(IoGetCurrentProcess()), "DNF.exe") == 0 || strcmp((char*)PsGetProcessImageFileName(IoGetCurrentProcess()), "dnf.exe") == 0)
+	{
+		return OB_PREOP_SUCCESS;
+	}
+	pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess = THREAD_ALL_ACCESS;
+	pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess = THREAD_ALL_ACCESS;
+	return OB_PREOP_SUCCESS;
+}
